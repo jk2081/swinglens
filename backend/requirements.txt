@@ -1,0 +1,36 @@
+# Web framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+
+# Database
+sqlalchemy[asyncio]>=2.0.36
+asyncpg>=0.30.0
+alembic>=1.14.0
+
+# Settings & validation
+pydantic-settings>=2.6.0
+python-multipart>=0.0.12
+
+# Logging
+structlog>=24.4.0
+
+# Async tasks
+celery>=5.4.0
+redis>=5.2.0
+
+# AWS
+boto3>=1.35.0
+
+# HTTP client
+httpx>=0.28.0
+
+# Auth
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Video & pose
+mediapipe>=0.10.18
+opencv-python-headless>=4.10.0
+
+# AI
+anthropic>=0.42.0
