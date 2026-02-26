@@ -1,15 +1,20 @@
 # Python
 __pycache__/
 *.py[cod]
+*.pyo
 *.egg-info/
+*.egg
 dist/
 build/
+*.whl
 
-# Virtual environment
+# Virtual environment (CLAUDE.md: backend/.venv/)
 backend/.venv/
 
-# Environment variables
+# Environment variables (CLAUDE.md: .env lives in repo root, never commit it)
 .env
+.env.local
+.env.*.local
 
 # IDE
 .idea/
@@ -17,13 +22,58 @@ backend/.venv/
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
 
 # OS
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# Node
+# Node (coach-dashboard & player-app)
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+# React / Vite (coach-dashboard)
+coach-dashboard/dist/
+
+# Expo / React Native (player-app)
+player-app/.expo/
+player-app/dist/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+coverage/
+.nyc_output/
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
 
 # Docker
 docker-compose.override.yml
+
+# Firebase credentials (CLAUDE.md: never commit)
+**/firebase-credentials.json
+**/serviceAccountKey.json
+
+# Misc
+*.log
+*.tmp
+*.bak
