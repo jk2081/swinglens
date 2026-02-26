@@ -1,24 +1,15 @@
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { HomePage } from './home';
 
 describe('HomePage', () => {
-  it('renders the SwingLens title', () => {
-    render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText('SwingLens')).toBeInTheDocument();
+  it('renders Dashboard heading', () => {
+    render(<HomePage />);
+    expect(screen.getByText('Dashboard')).toBeInTheDocument();
   });
 
-  it('renders the Coach Dashboard subtitle', () => {
-    render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText('Coach Dashboard')).toBeInTheDocument();
+  it('renders queue instructions', () => {
+    render(<HomePage />);
+    expect(screen.getByText(/select a swing from the review queue/i)).toBeInTheDocument();
   });
 });

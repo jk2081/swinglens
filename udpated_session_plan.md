@@ -102,7 +102,7 @@ Write tests: upload valid mp4, reject >50MB file (422), reject non-mp4 (422), st
 Set up Celery in backend/app/tasks/. Create the Celery app configuration in backend/app/celery_app.py using Redis as broker. Create the process_video task in backend/app/tasks/process_video.py. For now, implement only steps 1-3 of the pipeline from CLAUDE.md:
 
 1. Download the video from S3 to a temp file
-2. VALIDATE: Check duration is 1-8 seconds using ffprobe. Check resolution is at least 720p. If invalid, set video status='error' with a message.
+2. VALIDATE: Check duration is 1-20 seconds using ffprobe. Check resolution is at least 720p. If invalid, set video status='error' with a message.
 3. EXTRACT FRAMES: Use ffmpeg to extract all frames at the video's native FPS. Store frame count and FPS in the video record.
 
 Save extracted frames as /tmp/{video_id}/frame_{number}.jpg. Update video status to 'processing'. Log each step with structlog (include video_id and step name). On any failure, set status='error' with error message and clean up temp files.

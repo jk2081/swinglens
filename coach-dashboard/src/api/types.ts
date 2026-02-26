@@ -22,6 +22,25 @@ export interface AuthTokenResponse {
   token: string;
 }
 
+export interface CoachLoginResponse {
+  token: string;
+  coach: Coach;
+}
+
+export interface ReviewQueueItem {
+  id: string;
+  video_id: string;
+  player: {
+    id: string;
+    name: string;
+    handicap: number | null;
+  };
+  club_type: string | null;
+  overall_score: number | null;
+  flagged_issue: string | null;
+  uploaded_at: string;
+}
+
 export interface Coach {
   id: string;
   academy_id: string;
