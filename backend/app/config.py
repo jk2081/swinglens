@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     )
 
     # Database
-    database_url: str = "postgresql+asyncpg://swinglens:swinglens@localhost:5432/swinglens"
+    database_url: str = "postgresql+asyncpg://swinglens:swinglens@localhost:5433/swinglens"
 
     # Redis (Celery broker)
     redis_url: str = "redis://localhost:6379/0"

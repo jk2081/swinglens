@@ -1,0 +1,48 @@
+repos:
+  # Backend: ruff check + ruff format
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.2
+    hooks:
+      - id: ruff
+        name: ruff check (backend)
+        args: [--fix]
+        files: ^backend/
+      - id: ruff-format
+        name: ruff format (backend)
+        files: ^backend/
+
+  # Coach dashboard: eslint + prettier
+  - repo: local
+    hooks:
+      - id: coach-dashboard-eslint
+        name: eslint (coach-dashboard)
+        entry: bash -c 'cd coach-dashboard && npx eslint --max-warnings 0 src/'
+        language: system
+        files: ^coach-dashboard/src/
+        types_or: [ts, tsx]
+        pass_filenames: false
+      - id: coach-dashboard-prettier
+        name: prettier (coach-dashboard)
+        entry: bash -c 'cd coach-dashboard && npx prettier --check src/'
+        language: system
+        files: ^coach-dashboard/src/
+        types_or: [ts, tsx, css, json]
+        pass_filenames: false
+
+  # Player app: eslint + prettier
+  - repo: local
+    hooks:
+      - id: player-app-eslint
+        name: eslint (player-app)
+        entry: bash -c 'cd player-app && npx eslint --max-warnings 0 src/ app/'
+        language: system
+        files: ^player-app/(src|app)/
+        types_or: [ts, tsx]
+        pass_filenames: false
+      - id: player-app-prettier
+        name: prettier (player-app)
+        entry: bash -c 'cd player-app && npx prettier --check src/ app/'
+        language: system
+        files: ^player-app/(src|app)/
+        types_or: [ts, tsx, css, json]
+        pass_filenames: false

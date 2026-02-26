@@ -521,6 +521,131 @@ api.interceptors.request.use((config) => {
 - API endpoints: kebab-case plural (/api/v1/videos)
 - React components: PascalCase (SwingViewer, FrameComparison)
 
+### Linting & Formatting
+
+**Python (Ruff):**
+
+- Use Ruff for both linting and formatting — it replaces flake8, isort, and black
+- Config in `backend/pyproject.toml`:
+
+```toml
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "ASYNC"]
+# E = pycodestyle, F = pyflakes, I = isort, N = naming,
+# UP = pyupgrade, B = bugbear, SIM = simplify, ASYNC = async rules
+
+[tool.ruff.format]
+quote-style = "double"
+```
+
+- Run `ruff check .` and `ruff format .` before every commit
+- All code must pass `ruff check` with zero errors
+
+**TypeScript (ESLint + Prettier):**
+
+- ESLint with `@typescript-eslint` for linting
+- Prettier for formatting (single quotes, trailing commas, 100 char line width)
+- Config in each frontend project's `eslint.config.js` and `.prettierrc`
+- Run `npm run lint` and `npm run format` before every commit
+
+**Pre-commit (enforce on every commit):**
+
+- Install `pre-commit` (Python tool) in the repo root
+- `.pre-commit-config.yaml` runs: ruff check, ruff format, eslint, prettier
+- Every developer must run `pre-commit install` after cloning
+
+### Error Handling
+
+**Backend — Service Layer Pattern:**
+
+- Services raise custom exceptions, API layer catches and returns proper HTTP responses
+- Define exceptions in `backend/app/utils/exceptions.py`:
+
+```python
+class SwingLensError(Exception):
+    """Base exception for all app errors."""
+    def __init__(self, message: str, code: str = "INTERNAL_ERROR"):
+        self.message = message
+        self.code = code
+
+class VideoProcessingError(SwingLensError):
+    """Raised when video pipeline fails at any step."""
+    pass
+
+class PoseEstimationError(SwingLensError):
+    """Raised when MediaPipe can't detect a pose reliably."""
+    pass
+
+class StorageError(SwingLensError):
+    """Raised when S3 upload/download fails."""
+    pass
+
+class NotFoundError(SwingLensError):
+    """Raised when a requested resource doesn't exist."""
+    pass
+
+class AuthError(SwingLensError):
+    """Raised for auth failures."""
+    pass
+```
+
+- Register a global exception handler in FastAPI:
+
+```python
+@app.exception_handler(SwingLensError)
+async def swinglens_error_handler(request, exc):
+    status_map = {
+        NotFoundError: 404,
+        AuthError: 401,
+        VideoProcessingError: 422,
+    }
+    status = status_map.get(type(exc), 500)
+    return JSONResponse(status_code=status, content={"error": {"message": exc.message, "code": exc.code}})
+```
+
+- Never let raw Python exceptions leak to the API response — always catch and wrap
+- In Celery tasks: catch all exceptions, set video status='error' with the message, log the full traceback
+
+**Backend — Pipeline Error Recovery:**
+
+- If any step in the video pipeline fails, set `video.status = 'error'` and `video.error_message = str(error)`
+- Clean up partial artifacts (delete temp files, any partial S3 uploads)
+- Log the full error with structlog including video_id, step name, and traceback
+- The player sees a friendly error message, not a stack trace
+
+**Frontend — Error Handling:**
+
+- TanStack Query handles retries automatically (3 retries with exponential backoff for network errors)
+- Use TanStack Query's `onError` callbacks for mutations to show toast notifications
+- Global axios response interceptor: 401 → redirect to login, 500 → show generic error toast
+- All API errors display via shadcn Toast component — never silent failures
+
+### Logging
+
+**Backend (structlog):**
+
+- Use structured JSON logging everywhere — never `print()`
+- Log at appropriate levels:
+  - `INFO`: Request received, video processing started/completed, feedback submitted
+  - `WARNING`: Pose estimation low confidence, video validation failed, S3 retry
+  - `ERROR`: Pipeline failure, S3 failure, Claude API failure, unexpected exceptions
+- Always include context: `video_id`, `player_id`, `step_name`, `duration_ms`
+- Pattern:
+
+```python
+import structlog
+logger = structlog.get_logger()
+
+logger.info("video_processing_started", video_id=str(video.id), player_id=str(video.player_id))
+logger.error("pose_estimation_failed", video_id=str(video.id), step="pose_estimation", error=str(e))
+```
+
+- Never log sensitive data (tokens, passwords, full S3 keys)
+
 ---
 
 ## Video Processing Pipeline
@@ -1290,10 +1415,71 @@ API_BASE_URL=http://localhost:8000
 
 ## Testing Strategy
 
-- **Unit tests** for all service functions (pose estimator, angle calculator, swing detector, comparator)
-- **Integration tests** for API endpoints using httpx test client
-- **Test with real golf swing videos** — keep a set of 5-10 test videos in S3 (various skill levels, both camera angles, left and right-handed)
-- **Golden frame tests** — for a known video, verify that the pipeline extracts the same phases and similar angles each time (regression testing)
+**Rule: Every session that builds a service or API endpoint must include tests for that session's work.** Tests are not a separate phase — they're part of the definition of done.
+
+### Backend Testing (pytest + httpx)
+
+**Structure:**
+
+```
+backend/tests/
+├── conftest.py              # Shared fixtures: test DB, test client, auth helpers
+├── test_auth.py             # Auth endpoints
+├── test_players.py          # Player CRUD
+├── test_videos.py           # Video upload + status
+├── test_frames.py           # Frame endpoints
+├── test_feedback.py         # Feedback endpoints
+├── services/
+│   ├── test_pose_estimator.py
+│   ├── test_swing_detector.py
+│   ├── test_angle_calculator.py
+│   ├── test_comparator.py
+│   ├── test_annotator.py
+│   └── test_ai_feedback.py
+└── fixtures/
+    └── test_videos/         # 3-5 short golf swing clips for pipeline tests
+```
+
+**conftest.py must include:**
+
+- An async test database (use a separate PostgreSQL DB: `swinglens_test`)
+- A `test_client` fixture that provides an httpx AsyncClient pointed at the test app
+- `auth_token_coach` and `auth_token_player` fixtures that return valid JWTs
+- A `seed_data` fixture that creates a test academy, coach, and player
+
+**What to test per layer:**
+
+- **API endpoints:** Happy path (correct input → correct response), auth required (no token → 401), wrong role (player hitting coach endpoint → 403), validation (bad input → 422), not found (bad UUID → 404)
+- **Services:** Unit test with known inputs. For angle_calculator, use hardcoded landmark positions where you can hand-calculate the expected angle. For swing_detector, use a synthetic wrist-Y trajectory where you know where the phases should be. For comparator, use known angle pairs and verify severity thresholds.
+- **Pipeline:** Integration test that uploads a real test video and verifies the full pipeline produces frames, angles, and comparisons. This runs slower — mark with `@pytest.mark.slow`.
+
+**Test commands:**
+
+```bash
+cd backend
+pytest                        # run all tests
+pytest -x                     # stop on first failure
+pytest tests/test_auth.py     # run one file
+pytest -m "not slow"          # skip slow pipeline tests
+pytest --cov=app --cov-report=term-missing  # coverage report
+```
+
+**Coverage target:** 80%+ on `backend/app/services/` and `backend/app/api/`. Don't chase 100% — focus on the logic that matters.
+
+### Frontend Testing (Vitest + Testing Library)
+
+- Use Vitest (not Jest) for the coach dashboard — it integrates with Vite
+- Use React Testing Library for component tests
+- Test: form validation (Zod schemas reject bad input), API hook behavior (mock TanStack Query), critical user flows (coach can navigate queue, toggle view modes, submit feedback)
+- Don't test shadcn component internals — they're already tested upstream
+- Frontend test coverage is lower priority than backend — focus on the coach review flow and video upload flow
+
+### Test Data
+
+- Keep 3-5 short (2-3 second) golf swing test videos in `backend/tests/fixtures/test_videos/`
+- Include: one good DTL swing, one face-on swing, one with obvious faults, one left-handed
+- These videos are committed to the repo (they're small, <5MB each)
+- Use them for pipeline integration tests and for manual QA
 
 ---
 
